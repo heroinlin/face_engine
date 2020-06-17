@@ -1,0 +1,6 @@
+[submodule "thirdparty/face_detect_inference"]
+	path = thirdparty/face_detect_inference
+	url = https://github.com/heroinlin/interface_object_detection.git
+[submodule "thirdparty/face_track_inference"]
+	path = thirdparty/face_track_inference
+	url = https://github.com/heroinlin/interface_object_tracker.git
