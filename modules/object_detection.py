@@ -15,7 +15,7 @@ from thirdparty.face_detect_inference import \
 
 class IObjectDetector(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def detect(self, image: np.ndarray) -> list:
+    def detect(self, image: np.ndarray):
         """
         检测
 
@@ -53,18 +53,15 @@ class IObjectDetector(metaclass=abc.ABCMeta):
 
 
 class PyObjectDetector(IObjectDetector):
-    def __init__(self, checkpoint_file_path=None, device=None):
-        self.config = {"detect_threshold": 0.7, "nms_threshold": 0.3}
-        self.checkpoint_file_path = checkpoint_file_path
+    def __init__(self, model_path=None, device=None):
+        self.model_path = model_path
         self.device = device
         self.detector = None
         self.init_interface()
 
     def init_interface(self):
         self.detector = FaceDetector_ssd(
-            checkpoint_file_path=self.checkpoint_file_path,
-            detect_threshold=self.config["detect_threshold"],
-            nms_threshold=self.config["nms_threshold"],
+            model_path=self.model_path,
             device=self.device)
 
     def detect(self, image: np.ndarray) -> list:
@@ -79,13 +76,14 @@ class PyObjectDetector(IObjectDetector):
 
 
 class OnnxObjectDetector(IObjectDetector):
-    def __init__(self, checkpoint_file_path=None):
-        self.checkpoint_file_path = checkpoint_file_path
+    def __init__(self, model_path=None):
+        self.model_path = model_path
+        self.detector = None
         self.init_interface()
 
     def init_interface(self):
         self.detector = FaceDetector_onnx(
-            onnx_file_path=self.checkpoint_file_path)
+            model_path=self.model_path)
 
     def detect(self, image: np.ndarray) -> list:
         bounding_boxes = self.detector.detect(image)
@@ -117,6 +115,7 @@ def draw_detection_rects(image: np.ndarray, detection_rects: np.ndarray, color=(
             cv2.putText(image, f"{detection_rects[index, 4]:.03f}",
                         (int(detection_rects[index, 0] * width), int(detection_rects[index, 1] * height)),
                         1, 1, (255, 0, 255))
+    return image
 
 
 def main():
