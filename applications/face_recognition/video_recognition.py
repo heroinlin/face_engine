@@ -76,7 +76,7 @@ class VideoRecognition(object):
             height = 1.0
         box = [int(detection_rect[0] * width), int(detection_rect[1] * height),
                int(detection_rect[2] * width), int(detection_rect[3] * height)]
-        # box = self.random_enlarge_box(box, width, height, scale_w=1.1, scale_h=1.3)
+        box = self.random_enlarge_box(box, image.shape[1], image.shape[0], scale_w=1.1, scale_h=1.3)
         image = image[box[1]:box[3], box[0]:box[2], :]
         return image
 
@@ -116,6 +116,8 @@ class VideoRecognition(object):
         dist_mat = 1 - np.dot(features_array, self.person_feature_library.transpose())
         dist_sorted = np.sort(dist_mat, axis=1)
         dist_sorted_idx = np.argsort(dist_mat, axis=1)
+        if dist_sorted[0][0] > 0.3:
+            return 'unknown', 2.0
         return self.person_id_library[dist_sorted_idx[0][0]], dist_sorted[0][0]
 
     @staticmethod
@@ -126,9 +128,17 @@ class VideoRecognition(object):
         else:
             width = 1.0
             height = 1.0
-        cv2.putText(image, f"{person_id}",
-                    (int(rect[0] * width), int(rect[1] * height+10)),
-                    1, 1, (255, 0, 255))
+        pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        font = ImageFont.truetype('simkai.ttf', 15)
+        fillColor = (255, 0, 255)
+        position = (int(rect[0] * width), int(rect[1] * height+10))
+        draw = ImageDraw.Draw(pil_img)
+        draw.text(position, person_id, font=font, fill=fillColor)
+        image = cv2.cvtColor(np.asarray(pil_img), cv2.COLOR_RGB2BGR)
+        return image
+        # cv2.putText(image, f"{person_id}",
+        #             (int(rect[0] * width), int(rect[1] * height+10)),
+        #             1, 1, (255, 0, 255))
 
     def detect(self, video):
         """
@@ -155,13 +165,13 @@ class VideoRecognition(object):
             else:
                 bounding_boxes = []
             for rect in bounding_boxes:
-                face = self.crop_image(frame.copy(), rect)
+                face = self.crop_image(frame.copy(), rect, method=1)
                 cv2.imshow("face", face)
                 face_id, dist = self.recognition(face)
-                self.draw_person_id_on_image(frame, face_id, rect)
+                frame = self.draw_person_id_on_image(frame, face_id, rect)
             end_time = time.time()
             fps = 1/(end_time - start_time)
-            draw_detection_rects(frame, bounding_boxes)
+            draw_detection_rects(frame, bounding_boxes, method=1)
             if "win" in sys.platform:
                 cv2.imshow("object_detection", frame)
                 key = cv2.waitKey(self.decay_time)
@@ -170,6 +180,10 @@ class VideoRecognition(object):
                     self.decay_time = 1 if self.auto_play_flag else 0
                 if key == 27:
                     break
+                if key == ord('l'):
+                    frame_num += 500
+                    frame_num = min(frame_num, video.get(cv2.CAP_PROP_FRAME_COUNT))
+                    video.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
 
     def destroy(self):
         self.detector.destroy()

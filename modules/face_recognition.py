@@ -51,17 +51,15 @@ class IFeatureExtract(metaclass=abc.ABCMeta):
 
 
 class PyFeatureExtract(IFeatureExtract):
-    def __init__(self, checkpoint_file_path=None, device=None):
-        self.config = {"feature_size": 512}
-        self.checkpoint_file_path = checkpoint_file_path
+    def __init__(self, model_path=None, device=None):
+        self.model_path = model_path
         self.device = device
         self.extractor = None
         self.init_interface()
 
     def init_interface(self):
         self.extractor = FeatureExtract(
-            checkpoint_file_path=self.checkpoint_file_path,
-            feature_size=self.config['feature_size'])
+            model_path=self.model_path, device=self.device)
 
     def feature_extract(self, image: np.ndarray) -> list:
         feature = self.extractor.feature_extract(image)
@@ -75,15 +73,14 @@ class PyFeatureExtract(IFeatureExtract):
 
 
 class OnnxFeatureExtract(IFeatureExtract):
-    def __init__(self, onnx_file_path=None, device=None):
-        self.onnx_file_path = onnx_file_path
-        self.device = device
+    def __init__(self, model_path=None):
+        self.model_path = model_path
         self.extractor = None
         self.init_interface()
 
     def init_interface(self):
         self.extractor = ONNXFeatureExtract(
-            onnx_file_path=self.onnx_file_path)
+            model_path=self.model_path)
 
     def feature_extract(self, image: np.ndarray) -> list:
         feature = self.extractor.feature_extract(image)
