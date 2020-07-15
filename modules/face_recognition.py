@@ -7,7 +7,7 @@ import sys
 import cv2
 import numpy as np
 
-from thirdparty.face_recognition import \
+from thirdparty.face_recognition_inference import \
     FeatureExtract, ONNXFeatureExtract
 
 
@@ -66,7 +66,7 @@ class PyFeatureExtract(IFeatureExtract):
         return feature
 
     def set_config(self, key: str, value):
-        self.detector.set_config(key, value)
+        self.extractor.set_config(key, value)
 
     def destroy(self):
         pass
@@ -85,6 +85,9 @@ class OnnxFeatureExtract(IFeatureExtract):
     def feature_extract(self, image: np.ndarray) -> list:
         feature = self.extractor.feature_extract(image)
         return feature
+
+    def set_config(self, key: str, value):
+        return self.extractor.set_config(key, value)
 
     def destroy(self):
         pass
