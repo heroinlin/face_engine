@@ -10,3 +10,6 @@
 [submodule "thirdparty/face_quality_judge_interence"]
 	path = thirdparty/face_quality_judge_interence
 	url = https://github.com/heroinlin/face_quility_judge_interface.git
+[submodule "thirdparty/pedestrain_detect_inference"]
+	path = thirdparty/pedestrain_detect_inference
+	url = https://github.com/heroinlin/pedestrain_detect_inference.git
