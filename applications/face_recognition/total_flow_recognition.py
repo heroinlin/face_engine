@@ -356,13 +356,13 @@ class VideoRecognition(object):
 
         """
         new_current_persons = {}
-        init_current_persons = {'pedestrain_boxes': [],
-                                'face_boxes': [],
-                                'face_landmarks': [],
-                                'face_id': [],
-                                'face_score': [],
-                                'frame_num': []}
         for person_box in tracker_person_boxes:
+            init_current_persons = {'pedestrain_boxes': [],
+                                    'face_boxes': [],
+                                    'face_landmarks': [],
+                                    'face_id': [],
+                                    'face_score': [],
+                                    'frame_num': []}
             person_id = int(person_box[-1])
             current_person = self.current_persons.get(person_id, init_current_persons)
             new_current_persons.update({person_id: current_person})
@@ -425,6 +425,7 @@ class VideoRecognition(object):
             # print(person_boxes)
             tracker_person_boxes = self.tracker.track(_, np.array(person_boxes))
             self.update_current_person(tracker_person_boxes, frame_num)
+            # 将当前帧的行人检测结果和人脸检测结果写入self.current_persons
             for person_id, current_person in self.current_persons.items():
                 person_box = current_person['pedestrain_boxes'][0]
                 crop_person_box = self.crop_pedestrain_box(person_box)
@@ -432,6 +433,7 @@ class VideoRecognition(object):
                 # cv2.imshow("person", person_image)
                 # face_box = self.face_detector.detect(person_image)
                 face_box, detect_boxes_landmark = self.face_detector.detect_boxes_landmarks(person_image)
+                # print(frame_num, face_box, detect_boxes_landmark)
                 if face_box.shape[0]:
                     face_box, detect_boxes_landmark = self.face_box_transform(crop_person_box, face_box,
                                                                               detect_boxes_landmark)
@@ -449,33 +451,40 @@ class VideoRecognition(object):
                 pedestrain_box = current_person['pedestrain_boxes'][0]
                 face_box = current_person['face_boxes'][0]
                 face_landmark = current_person['face_landmarks'][0]
+                # 当前行人框没有检测到人脸跳过进行下一行人轨迹的人脸检测
                 if not len(face_box):
                     self.current_persons[person_id]['face_id'].insert(0, 'None')
                     self.current_persons[person_id]['face_score'].insert(0, 0)
                     continue
+                # 由当前行人框裁剪出需要的人脸框并进行人脸关键点的矫正
                 current_pedestrain_boxes.append(pedestrain_box)
                 crop_face_box = self.enlarge_box(face_box.copy(), w_scale=1.5, h_scale=1.5)
                 face_image = self.crop_face_image(frame, crop_face_box, method=1)
                 crop_face_landmark = self.face_lankmark_transform(crop_face_box, face_landmark.copy(), method=0)
                 face_image = self.face_align.align(face_image, crop_face_landmark.reshape(5, 2))
                 face_image = cv2.resize(face_image, (112, 112))
-                if frame_num % 2 != 0:
+                # 设置人脸识别频率, 不识别时继承当前轨迹中的'name'结果
+                if frame_num % 5 != 0:
                     self.get_current_face_id()
                     face_id = self.current_persons[person_id].get('name', 'None')
                     self.current_persons[person_id]['face_id'].insert(0, face_id)
                     self.current_persons[person_id]['face_score'].insert(0, 0.5)
+                    face_box[4] = 0.5
+                    # 只显示有人脸的结果
                     if face_id != 'None':
                         cv2.imshow("faces", face_image)
                         image = self.draw_person_id_on_image(image, face_id, face_box)
                         current_face_boxes.append(face_box)
                         current_face_landmarks.append(face_landmark)
                 else:
+                    # 人脸过滤
                     if self.face_boxes_filter(face_image, crop_face_box):
+                        # 此处进行人脸识别
                         face_id, dist = self.recognition(face_image)
                         face_box[4] = face_box[4] * dist
                         self.current_persons[person_id]['face_id'].insert(0, face_id)
                         self.current_persons[person_id]['face_score'].insert(0, face_box[4])
-                        if face_box[4] > 0.5:
+                        if face_box[4] >= 0.5:
                             cv2.imshow("faces", face_image)
                             image = self.draw_person_id_on_image(image, face_id, face_box)
                             current_face_boxes.append(face_box)
