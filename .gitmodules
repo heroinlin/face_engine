@@ -13,3 +13,6 @@
 [submodule "thirdparty/pedestrain_detect_inference"]
 	path = thirdparty/pedestrain_detect_inference
 	url = https://github.com/heroinlin/pedestrain_detect_inference.git
+[submodule "thirdparty/face_landmark_detect_interface"]
+	path = thirdparty/face_landmark_detect_interface
+	url = https://github.com/heroinlin/face_landmark_detect_interface.git
