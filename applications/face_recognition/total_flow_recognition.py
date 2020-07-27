@@ -14,10 +14,10 @@ sys.path.append(os.path.dirname(os.path.dirname(working_root)))
 from modules.face_align import PtFaceAlign
 from modules.object_detection import RetinaFaceDetector as FaceDetector, OnnxObjectDetector, draw_detection_rects
 from modules.face_recognition import OnnxFeatureExtract as FeatureExtract
-from modules.object_track import SortTracker as Tracker, draw_track_rects
+from modules.object_track import SortTrack as Tracker, draw_track_rects
 from modules.face_quility_judge import BlurJudge
-# from modules.pedestrian_detection import OnnxObjectDetector as PedestrianDetector
-from modules.pedestrian_detection import TorchObjectDetector as PedestrianDetector
+from modules.pedestrian_detection import OnnxObjectDetector as PedestrianDetector
+# from modules.pedestrian_detection import TorchObjectDetector as PedestrianDetector
 
 
 class VideoRecognition(object):
@@ -47,9 +47,9 @@ class VideoRecognition(object):
             'width': 1080,
             'height': 720,
             'feature_size': 512,
-            'pic_nums': 10,
+            'pic_nums': 20,
             'mean_feature': True,
-            'recog_score': 0.7
+            'recog_score': 0.3
         }
 
     def init(self):
@@ -302,13 +302,19 @@ class VideoRecognition(object):
         features_array = self.extractor.feature_extract(image)
         features_array = features_array.reshape(-1, self.config['feature_size'])
         features_array = self.normalize(features_array, axis=1)
-        dist_mat = 1 - np.dot(features_array, self.person_feature_library.transpose())
-        dist_sorted = np.sort(dist_mat, axis=1)
-        dist_sorted_idx = np.argsort(dist_mat, axis=1)
-        recog_score = (dist_sorted[0][0] - self.config['recog_score']) / self.config['recog_score']
-        if recog_score > 0:
-            return 'unknown', min(1.0, 0.5 + recog_score)
-        return self.person_id_library[dist_sorted_idx[0][0]], min(1.0, 0.7 - recog_score)
+        # dist_mat = 1 - np.dot(features_array, self.person_feature_library.transpose())
+        # dist_sorted = np.sort(dist_mat, axis=1)
+        # dist_sorted_idx = np.argsort(dist_mat, axis=1)
+        # recog_score = (dist_sorted[0][0] - self.config['recog_score']) / self.config['recog_score']
+        # if recog_score > 0:
+        #     return 'unknown', min(1.0, 0.5 + recog_score)
+        # return self.person_id_library[dist_sorted_idx[0][0]], min(1.0, 0.7 - recog_score)
+        dist_mat = np.dot(features_array, self.person_feature_library.transpose())
+        dist_sorted = np.max(dist_mat, axis=1)
+        dist_sorted_idx = np.argmax(dist_mat, axis=1)
+        if dist_sorted < self.config['recog_score']:
+            return 'unknown', min(1.0, dist_sorted)
+        return self.person_id_library[dist_sorted_idx[0]], min(1.0, dist_sorted)
 
     @staticmethod
     def draw_person_id_on_image(image, person_id, rect, method=1):
@@ -375,7 +381,7 @@ class VideoRecognition(object):
         """轨迹保留最近的至多pic_nums张人脸得分大于0.5的信息"""
         for person_id in self.current_persons.keys():
             if len(self.current_persons[person_id]['frame_num']) > self.config['pic_nums']:
-                indeces = np.where(np.array(self.current_persons[person_id]['face_score']) > 0.5)
+                indeces = np.where(np.array(self.current_persons[person_id]['face_score']) > self.config['recog_score'])
                 indices = np.argsort(np.array(self.current_persons[person_id]['face_score']))[::-1]
                 indices = [index for index in indices[:self.config['pic_nums']] if index in indeces[0]]
                 for key in self.current_persons[person_id].keys():
@@ -387,11 +393,11 @@ class VideoRecognition(object):
     def get_current_face_id(self):
         """采用轨迹中人脸得分大于0.5部分的id众数作为当前轨迹的默认id"""
         for person_id in self.current_persons.keys():
-            indeces = np.where(np.array(self.current_persons[person_id]['face_score']) > 0.5)
+            indeces = np.where(np.array(self.current_persons[person_id]['face_score']) > self.config['recog_score'])
             indices = np.argsort(np.array(self.current_persons[person_id]['face_score']))[::-1]
             face_id_list = [self.current_persons[person_id]['face_id'][index] for index in indices if
                             index in indeces[0]]
-            if len(face_id_list) > 1:
+            if len(face_id_list) >= 1:
                 counts = Counter(face_id_list)
                 self.current_persons[person_id].update({'name': counts.most_common(1)[0][0]})
 
@@ -453,7 +459,7 @@ class VideoRecognition(object):
                 face_landmark = current_person['face_landmarks'][0]
                 # 当前行人框没有检测到人脸跳过进行下一行人轨迹的人脸检测
                 if not len(face_box):
-                    self.current_persons[person_id]['face_id'].insert(0, 'None')
+                    self.current_persons[person_id]['face_id'].insert(0, 'Unknown')
                     self.current_persons[person_id]['face_score'].insert(0, 0)
                     continue
                 # 由当前行人框裁剪出需要的人脸框并进行人脸关键点的矫正
@@ -466,33 +472,33 @@ class VideoRecognition(object):
                 # 设置人脸识别频率, 不识别时继承当前轨迹中的'name'结果
                 if frame_num % 5 != 0:
                     self.get_current_face_id()
-                    face_id = self.current_persons[person_id].get('name', 'None')
+                    face_id = self.current_persons[person_id].get('name', 'Unknown')
                     self.current_persons[person_id]['face_id'].insert(0, face_id)
-                    self.current_persons[person_id]['face_score'].insert(0, 0.5)
-                    face_box[4] = 0.5
+                    self.current_persons[person_id]['face_score'].insert(0, 0)
+                    face_box[4] = 0
                     # 只显示有人脸的结果
-                    if face_id != 'None':
-                        cv2.imshow("faces", face_image)
-                        image = self.draw_person_id_on_image(image, face_id, face_box)
-                        current_face_boxes.append(face_box)
-                        current_face_landmarks.append(face_landmark)
+                    cv2.imshow("faces", face_image)
+                    image = self.draw_person_id_on_image(image, face_id, face_box)
+                    current_face_boxes.append(face_box)
+                    current_face_landmarks.append(face_landmark)
                 else:
                     # 人脸过滤
                     if self.face_boxes_filter(face_image, crop_face_box):
                         # 此处进行人脸识别
                         face_id, dist = self.recognition(face_image)
-                        face_box[4] = face_box[4] * dist
+                        face_box[4] = dist
                         self.current_persons[person_id]['face_id'].insert(0, face_id)
                         self.current_persons[person_id]['face_score'].insert(0, face_box[4])
-                        if face_box[4] >= 0.5:
-                            cv2.imshow("faces", face_image)
-                            image = self.draw_person_id_on_image(image, face_id, face_box)
-                            current_face_boxes.append(face_box)
-                            current_face_landmarks.append(face_landmark)
+
+                        cv2.imshow("faces", face_image)
+                        image = self.draw_person_id_on_image(image, face_id, face_box)
+                        current_face_boxes.append(face_box)
+                        current_face_landmarks.append(face_landmark)
                     else:
-                        self.current_persons[person_id]['face_id'].insert(0, 'None')
+                        self.current_persons[person_id]['face_id'].insert(0, 'Unknown')
                         self.current_persons[person_id]['face_score'].insert(0, 0)
             self.crop_current_person()
+            print(self.current_persons)
             end_time = time.time()
             fps = 1 / (end_time - start_time)
             draw_track_rects(image, np.array(tracker_person_boxes), method=1)
