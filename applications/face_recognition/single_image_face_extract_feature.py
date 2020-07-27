@@ -363,6 +363,10 @@ class FeatureExtract(ONNXInference):
         crop_image = self.crop_face_image(image, box, method=1)
         landmark = self.face_lankmark_transform(box, landmark, image.shape[1], image.shape[0])
         image = self.face_align.align(crop_image, landmark.reshape(5, 2))
+        # 直接用关键点对齐, 效果一样, 不需要box参与
+        # landmark[::2] = landmark[::2] * image.shape[1]
+        # landmark[1::2] = landmark[1::2] * image.shape[0]
+        # image = self.face_align.align(image, landmark.reshape(5, 2))
         if self.config['color_format'] == "RGB":
             image = image[:, :, ::-1]
         if self.config['width'] > 0 and self.config['height'] > 0:
