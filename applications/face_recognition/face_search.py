@@ -39,27 +39,53 @@ class PersonSearch():
             # 归一化
             person_id_features = self.normalize(person_id_features, axis=1)
             self.person_feature_library = np.vstack((self.person_feature_library, person_id_features))
-    
+
+    def compute_dist(self, array1, array2, type='cosine'):
+        """Compute the euclidean or cosine distance of all pairs.
+        Args:
+          array1: numpy array with shape [m1, n]
+          array2: numpy array with shape [m2, n]
+          type: one of ['cosine', 'euclidean']
+        Returns:
+          numpy array with shape [m1, m2]
+        """
+        assert type in ['cosine', 'euclidean']
+        array1 = self.normalize(array1, axis=1)
+        array2 = self.normalize(array2, axis=1)
+        if type == 'cosine':
+            dist = np.matmul(array1, array2.T)
+            # dist = np.np.dot(array1, array2.T)
+            return dist
+        else:
+            # shape [m1, 1]
+            square1 = np.sum(np.square(array1), axis=1)[..., np.newaxis]
+            # shape [1, m2]
+            square2 = np.sum(np.square(array2), axis=1)[np.newaxis, ...]
+            squared_dist = - 2 * np.matmul(array1, array2.T) + square1 + square2
+            squared_dist[squared_dist < 0] = 0
+            dist = np.sqrt(squared_dist)
+            dist = 1 - dist/1.54
+            return dist
+
     def validation(self, image_path):
         image = cv2.imdecode(np.fromfile(image_path, np.uint8()), 1)
         features_array = self.feature_extractor.feature_extract(image)
         features_array = features_array.reshape(-1, self.config['feature_size'])
-        features_array = self.normalize(features_array, axis=1)
         if self.person_feature_library is None:
             print("No person in the person library!")
             exit(-1)
-        dist_mat = 1 - np.dot(features_array, self.person_feature_library.transpose())
-        dist_sorted = np.sort(dist_mat, axis=1)
-        dist_sorted_idx = np.argsort(dist_mat, axis=1)
+        dist_mat = self.compute_dist(features_array, self.person_feature_library)
+        dist_sorted = np.max(dist_mat, axis=1)
+        dist_sorted_idx = np.argmax(dist_mat, axis=1)
         print(dist_mat)
-        return self.person_id_library[dist_sorted_idx[0][0]], dist_sorted[0][0]
+        return self.person_id_library[dist_sorted_idx[0]], dist_sorted[0]
 
 
 def main():
-    person_library = r"F:\tmp\person_search\worker_face.door"
+    person_library = r"F:\tmp\person_search\face_imgs"
     work_root = os.path.dirname(os.path.dirname(working_root))
-    # onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/backbone_ir50_asia-sim.onnx")
-    onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/plr_osnet_237_2.1969-sim.onnx")
+    onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/backbone_ir50_asia-sim.onnx")
+    # onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/plr_osnet_237_2.1969-sim.onnx")
     person_search = PersonSearch(person_library, onnx_file_path)
     person_search.person_library_feature_extract()
     query_image_folder = r"F:\tmp\person_search\worker_face.inside"

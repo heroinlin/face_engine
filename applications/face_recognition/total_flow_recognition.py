@@ -49,7 +49,8 @@ class VideoRecognition(object):
             'feature_size': 512,
             'pic_nums': 20,
             'mean_feature': True,
-            'recog_score': 0.3
+            'recog_score': 0.3,
+            'dist_type': "cosine"  # cosine  or  euclidean
         }
 
     def init(self):
@@ -285,6 +286,33 @@ class VideoRecognition(object):
             self.person_id_library.extend([person_folder] * person_id_features.shape[0])
             self.person_feature_library = np.vstack((self.person_feature_library, person_id_features))
 
+    def compute_dist(self, array1, array2, type='euclidean'):
+        """Compute the euclidean or cosine distance of all pairs.
+        Args:
+          array1: numpy array with shape [m1, n]
+          array2: numpy array with shape [m2, n]
+          type: one of ['cosine', 'euclidean']
+        Returns:
+          numpy array with shape [m1, m2]
+        """
+        assert type in ['cosine', 'euclidean']
+        array1 = self.normalize(array1, axis=1)
+        array2 = self.normalize(array2, axis=1)
+        if type == 'cosine':
+            dist = np.matmul(array1, array2.T)
+            # dist = np.np.dot(array1, array2.T)
+            return dist
+        else:
+            # shape [m1, 1]
+            square1 = np.sum(np.square(array1), axis=1)[..., np.newaxis]
+            # shape [1, m2]
+            square2 = np.sum(np.square(array2), axis=1)[np.newaxis, ...]
+            squared_dist = - 2 * np.matmul(array1, array2.T) + square1 + square2
+            squared_dist[squared_dist < 0] = 0
+            dist = np.sqrt(squared_dist)
+            dist = 1 - dist/1.54
+            return dist
+
     def recognition(self, image):
         """
         对输入人脸图像进行特征提, 同时与已有人脸查询库进行匹配查询
@@ -302,14 +330,7 @@ class VideoRecognition(object):
         features_array = self.extractor.feature_extract(image)
         features_array = features_array.reshape(-1, self.config['feature_size'])
         features_array = self.normalize(features_array, axis=1)
-        # dist_mat = 1 - np.dot(features_array, self.person_feature_library.transpose())
-        # dist_sorted = np.sort(dist_mat, axis=1)
-        # dist_sorted_idx = np.argsort(dist_mat, axis=1)
-        # recog_score = (dist_sorted[0][0] - self.config['recog_score']) / self.config['recog_score']
-        # if recog_score > 0:
-        #     return 'unknown', min(1.0, 0.5 + recog_score)
-        # return self.person_id_library[dist_sorted_idx[0][0]], min(1.0, 0.7 - recog_score)
-        dist_mat = np.dot(features_array, self.person_feature_library.transpose())
+        dist_mat = self.compute_dist(features_array, self.person_feature_library, self.config['dist_type'])
         dist_sorted = np.max(dist_mat, axis=1)
         dist_sorted_idx = np.argmax(dist_mat, axis=1)
         if dist_sorted < self.config['recog_score']:
@@ -529,6 +550,7 @@ def main():
     # video_path = os.path.join(work_root, "data/video_data/videos/inside-alg-000.mp4")
     video_path = r"E:\videos\outside-data.mp4"
     onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/backbone_ir50_asia-sim.onnx")
+    # onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/model_mobilefacenet-sim.onnx")
     # onnx_file_path = os.path.join(work_root, r"checkpoints/face_reid/plr_osnet_246_2.1345-sim.onnx")
     face_detector = FaceDetector(r"D:\workspace\Pytorch\bitbucket\face_projects\thirdparty"
                                  r"\face_detect_inference\face_detect_landmark_onnx\onnx\rtface_mb_256_sim.onnx")
@@ -538,9 +560,15 @@ def main():
     #                                    r"\face_detect_inference\face_detect_onnx\onnx_model"
     #                                    r"\mobilenet_v2_0.25_43_0.1162-sim.onnx")
     extractor = FeatureExtract(onnx_file_path)
-    extractor.set_config('mean', [127.5, 127.5, 127.5])
-    extractor.set_config('stddev', [128, 128, 128])
-    extractor.set_config('divisor', 1.0)
+    # backbone_ir50_asia-sim.onnx
+    # extractor.set_config('mean', [127.5, 127.5, 127.5])
+    # extractor.set_config('stddev', [128, 128, 128])
+    # extractor.set_config('divisor', 1.0)
+
+    # model_mobilefacenet-sim.onnx
+    extractor.set_config('mean', [0.5, 0.5, 0.5])
+    extractor.set_config('stddev', [0.5, 0.5, 0.5])
+    extractor.set_config('divisor', 255.0)
     person_search = VideoRecognition(person_library, face_detector=face_detector, extractor=extractor)
     person_search.person_library_feature_extract()
     print(person_search.person_feature_library.shape)
