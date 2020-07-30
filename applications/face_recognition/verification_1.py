@@ -339,16 +339,22 @@ class Evaluation(object):
         np.ndarray
             原始图像经过预处理后得到的数组
         """
+        # 将打包的图像去除原归一化处理
+        image = np.transpose(image, [0, 2, 3, 1])
+        images = (images * 0.5 + 0.5) * 255.0  
+        image = image[:, :, :, ::-1]
+        
         if self.config['color_format'] == "RGB":
-            image = image[:, :, :, ::-1]
+            image = image[:, :, ::-1]
         if hflip:
-            image = image[:, ::-1, :, :]
+            image = image[::-1, :, :]
         # if self.config['width'] > 0 and self.config['height'] > 0:
         #     # image = cv2.resize(image, (self.config['width'], self.config['height']))
         #     image = cv2.resize(image, (128, 128))
         #     image = self.center_crop(image, self.config['width'], self.config['height'])
         input_image = (np.array(image, dtype=np.float32) / self.config['divisor'] - self.config['mean']) / self.config[
             'stddev']
+        input_image = np.transpose(input_image, [0, 3, 1, 2])
         return input_image
 
     def _post_process(self, features):
@@ -360,8 +366,9 @@ class Evaluation(object):
 
     def batch_feature_extract(self, images):
         # features = model(batch_images)
-        images = torch.from_numpy(images).float()
-        output = self.batch_inference(images)
+        batch_images = self._pre_process(images)
+        batch_images = torch.from_numpy(batch_images).float()
+        output = self.batch_inference(batch_images)
         features_array = self._post_process(output)
         return features_array
 
