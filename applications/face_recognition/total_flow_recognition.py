@@ -491,7 +491,7 @@ class VideoRecognition(object):
                 face_image = self.face_align.align(face_image, crop_face_landmark.reshape(5, 2))
                 face_image = cv2.resize(face_image, (112, 112))
                 # 设置人脸识别频率, 不识别时继承当前轨迹中的'name'结果
-                if frame_num % 5 != 0:
+                if len(current_person['frame_num']) % 5 != 1:
                     self.get_current_face_id()
                     face_id = self.current_persons[person_id].get('name', 'Unknown')
                     self.current_persons[person_id]['face_id'].insert(0, face_id)
