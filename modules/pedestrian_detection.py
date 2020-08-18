@@ -4,9 +4,10 @@ import abc
 import os
 import cv2
 import numpy as np
-
-from thirdparty.pedestrian_detect_inference import PedestrainDetector_rfb
-from thirdparty.pedestrian_detect_inference import PedestrainDetector_faster_rcnn
+working_root = os.path.split(os.path.realpath(__file__))[0]
+sys.path.append(os.path.dirname(working_root))
+from thirdparty.pedestrian_detect_inference import PedestrianDetector_rfb
+from thirdparty.pedestrian_detect_inference import PedestrianDetector_faster_rcnn
 from thirdparty.pedestrian_detect_inference import PedestrianDetector_onnx
 
 
@@ -55,9 +56,9 @@ class RfbObjectDetector(IObjectDetector):
         self.init_interface()
 
     def init_interface(self):
-        self.detector = PedestrainDetector_rfb(model_path=self.model_path)
+        self.detector = PedestrianDetector_rfb(model_path=self.model_path)
 
-    def detect(self, image: np.ndarray) -> np.ndarray
+    def detect(self, image: np.ndarray) -> np.ndarray:
         bounding_boxes = self.detector.detect(image)
         return np.array(bounding_boxes)
 
@@ -67,6 +68,7 @@ class RfbObjectDetector(IObjectDetector):
     def destroy(self):
         pass
 
+
 class OnnxObjectDetector(IObjectDetector):
     def __init__(self, model_path=None):
         self.model_path = model_path
@@ -75,7 +77,7 @@ class OnnxObjectDetector(IObjectDetector):
     def init_interface(self):
         self.detector = PedestrianDetector_onnx(model_path=self.model_path)
 
-    def detect(self, image: np.ndarray) -> np.ndarray
+    def detect(self, image: np.ndarray) -> np.ndarray:
         bounding_boxes = self.detector.detect(image)
         return bounding_boxes
 
@@ -85,13 +87,14 @@ class OnnxObjectDetector(IObjectDetector):
     def destroy(self):
         pass
 
+
 class TorchObjectDetector(IObjectDetector):
     def __init__(self, model_path=None):
         self.model_path = model_path
         self.init_interface()
 
     def init_interface(self):
-        self.detector = PedestrainDetector_faster_rcnn()
+        self.detector = PedestrianDetector_faster_rcnn()
 
     def detect(self, image: np.ndarray) -> np.ndarray:
         bounding_boxes = self.detector.detect(image)
