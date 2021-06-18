@@ -102,6 +102,32 @@ def object_detection_for_videos_folder_test(video_folder_path: str,
     video.release()
 
 
+def object_detection_for_camera(checkpoint_file_path: str = None,
+                                mean: list = None,
+                                stddev: list = None):
+    """
+        视频文件夹目标检测
+        Parameters
+        ----------
+        checkpoint_file_path 目标检测模型地址
+        mean 目标检测模型训练使用的图像均值
+        stddev 目标检测模型训练使用的图像标准差
+        Returns
+        -------
+            None
+    """
+    detector = None
+    if checkpoint_file_path is not None:
+        detector = OnnxObjectDetector(checkpoint_file_path)
+    video = cv2.VideoCapture()
+    video_object_detection = VideoObjectDetection(detector=detector)
+    if not video.open(0):
+        print("can not open the video: ", video_path)
+        return
+    video_object_detection.detect(video)
+    video.release()
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -130,14 +156,17 @@ def parse_args():
 
 
 def main():
+    if "darwin" in sys.platform:
+        os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'  # 解决OpenMP报错问题
     args = parse_args()
     print(args)
     if args.mean is not None:
         assert type(args.mean) == list and len(args.mean) == 3
     if args.stddev is not None:
         assert type(args.stddev) == list and len(args.stddev) == 3
-    object_detection_for_videos_folder_test(args.video_folder_path, args.model,
-                                            args.mean, args.stddev)
+    object_detection_for_camera(args.model, args.mean, args.stddev)
+    # object_detection_for_videos_folder_test(args.video_folder_path, args.model,
+    #                                         args.mean, args.stddev)
 
 
 if __name__ == '__main__':
